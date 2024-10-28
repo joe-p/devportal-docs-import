@@ -13,6 +13,12 @@ import { visit } from 'unist-util-visit'
 import { Node } from 'unist'
 import { Link } from 'mdast'
 
+/** A mapping of filename prefixes to the directory they should be moved to. */
+const dirPrefixes: Record<string, string> = {
+  lg: 'Language Guide',
+  api: 'API Reference'
+}
+
 const transformLinks = () => {
   return (tree: Node) => {
     visit(tree, 'link', (node: Link) => {
@@ -21,8 +27,22 @@ const transformLinks = () => {
         const originalUrl = url
         node.url = `../${url.replace('.md', '')}`
 
+        Object.keys(dirPrefixes).forEach(prefix => {
+          if (path.basename(node.url).startsWith(prefix)) {
+            node.url = node.url.replace(
+              prefix,
+              '../' +
+                dirPrefixes[prefix].toLowerCase().replaceAll(' ', '-') +
+                '/' +
+                prefix
+            )
+          }
+        })
+
         console.log(`Transformed link (${originalUrl}) to (${node.url})`)
       }
+
+      // TODO: slug transformation
     })
   }
 }
@@ -73,17 +93,12 @@ export async function run(): Promise<void> {
     await Promise.all(transformations)
     core.endGroup()
 
-    const dirs: Record<string, string> = {
-      lg: 'Language Guide',
-      api: 'API Reference'
-    }
-
     const dirIndexFiles: Record<string, string> = {
       'language-guide.md': 'Language Guide',
       'api.md': 'API Reference'
     }
 
-    Object.values(dirs).forEach(dir => {
+    Object.values(dirPrefixes).forEach(dir => {
       console.log(`Creating "${dir}" directory`)
       mkdirSync(path.join(outPath, dir), { recursive: true })
     })
@@ -103,7 +118,7 @@ export async function run(): Promise<void> {
 
       const dirPrefix = fileName.split('-')[0]
       if (dirPrefix.endsWith('.md')) return
-      const dirName = dirs[dirPrefix]
+      const dirName = dirPrefixes[dirPrefix]
       // Put in dir if dirName is defined, otherwise put in root
       const dest = path.join(outPath, dirName ?? '', fileName)
       renameSync(file, dest)
