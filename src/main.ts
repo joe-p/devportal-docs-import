@@ -8,6 +8,24 @@ import {
   writeFileSync,
   readFileSync
 } from 'fs'
+import { remark } from 'remark'
+import { visit } from 'unist-util-visit'
+import { Node } from 'unist'
+import { Link } from 'mdast'
+
+const transformLinks = () => {
+  return (tree: Node) => {
+    visit(tree, 'link', (node: Link) => {
+      const { url } = node
+      if (url.trim() && !url.startsWith('https://') && !url.startsWith('#')) {
+        const originalUrl = url
+        node.url = `../${url.replace('.md', '')}`
+
+        console.log(`Transformed link (${originalUrl}) to (${node.url})`)
+      }
+    })
+  }
+}
 
 /**
  * The main function for the action.
@@ -31,12 +49,16 @@ export async function run(): Promise<void> {
     }
     core.endGroup()
 
-    core.startGroup('Adding frontmatter')
-    files.forEach(file => {
-      const content = readFileSync(file, 'utf8')
+    core.startGroup('Transforming content')
+    const transformations = files.map(async file => {
+      const result = await remark()
+        .use(transformLinks)
+        .process(readFileSync(file, 'utf8'))
+
+      let newContent = String(result)
 
       // Use the first h1 as the title
-      let title = content.match(/^# (.*)$/m)?.[1]
+      let title = newContent.match(/^# (.*)$/m)?.[1]
 
       // Some titles are links in backticks, ie `[title](link)`
       title = title?.split('`')[1] ?? title
@@ -44,10 +66,11 @@ export async function run(): Promise<void> {
       console.log(`Setting ${path.relative(outPath, file)} title to "${title}"`)
 
       // Write content with frontmatter and first h1 removed (astro does it for us based on frontmatter)
-      const newContent = `---\ntitle: "${title}"\n---\n\n${content.replace(/^# .*\n/, '')}`
+      newContent = `---\ntitle: "${title}"\n---\n\n${newContent.replace(/^# .*\n/, '')}`
 
       writeFileSync(file, newContent)
     })
+    await Promise.all(transformations)
     core.endGroup()
 
     const dirs: Record<string, string> = {

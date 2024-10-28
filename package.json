@@ -1,5 +1,6 @@
 {
   "name": "typescript-action",
+  "type": "module",
   "description": "GitHub Actions TypeScript template",
   "version": "0.0.0",
   "author": "",
@@ -68,7 +69,9 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/glob": "^0.5.0"
+    "@actions/glob": "^0.5.0",
+    "remark": "^15.0.1",
+    "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
     "@github/local-action": "^2.1.2",
