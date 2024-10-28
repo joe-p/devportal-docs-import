@@ -13,6 +13,12 @@ import { visit } from 'unist-util-visit'
 import { Node } from 'unist'
 import { Link } from 'mdast'
 
+/** A mapping of filename prefixes to the directory they should be moved to. */
+const dirPrefixes: Record<string, string> = {
+  lg: 'Language Guide',
+  api: 'API Reference'
+}
+
 const transformLinks = () => {
   return (tree: Node) => {
     visit(tree, 'link', (node: Link) => {
@@ -21,8 +27,22 @@ const transformLinks = () => {
         const originalUrl = url
         node.url = `../${url.replace('.md', '')}`
 
+        Object.keys(dirPrefixes).forEach(prefix => {
+          if (path.basename(node.url).startsWith(prefix)) {
+            node.url = node.url.replace(
+              prefix,
+              '../' +
+                dirPrefixes[prefix].toLowerCase().replaceAll(' ', '-') +
+                '/' +
+                prefix
+            )
+          }
+        })
+
         console.log(`Transformed link (${originalUrl}) to (${node.url})`)
       }
+
+      // TODO: slug transformation
     })
   }
 }
@@ -35,80 +55,30 @@ export async function run(): Promise<void> {
   try {
     const docsPath = core.getInput('docsPath', { required: true })
     const outPath = core.getInput('outPath', { required: true })
+    const htmlPath = path.join(outPath, 'html')
 
-    const globber = await glob.create(path.join(docsPath, '**.md'))
+    const globber = await glob.create(path.join(docsPath, '**.html'))
 
     const files = []
 
-    core.startGroup('Copying markdown files')
+    core.startGroup('Copying HTML files')
     for await (const file of globber.globGenerator()) {
       console.log(`Copying ${path.relative(docsPath, file)}`)
-      const dest = path.join(outPath, path.relative(docsPath, file))
+      const dest = path.join(htmlPath, path.relative(docsPath, file))
+
+      mkdirSync(path.dirname(dest), { recursive: true })
+
       copyFileSync(file, dest)
       files.push(dest)
     }
     core.endGroup()
 
     core.startGroup('Transforming content')
-    const transformations = files.map(async file => {
-      const result = await remark()
-        .use(transformLinks)
-        .process(readFileSync(file, 'utf8'))
-
-      let newContent = String(result)
-
-      // Use the first h1 as the title
-      let title = newContent.match(/^# (.*)$/m)?.[1]
-
-      // Some titles are links in backticks, ie `[title](link)`
-      title = title?.split('`')[1] ?? title
-
-      console.log(`Setting ${path.relative(outPath, file)} title to "${title}"`)
-
-      // Write content with frontmatter and first h1 removed (astro does it for us based on frontmatter)
-      newContent = `---\ntitle: "${title}"\n---\n\n${newContent.replace(/^# .*\n/, '')}`
-
-      writeFileSync(file, newContent)
-    })
-    await Promise.all(transformations)
+    console.log('TODO: Transform content')
     core.endGroup()
 
-    const dirs: Record<string, string> = {
-      lg: 'Language Guide',
-      api: 'API Reference'
-    }
-
-    const dirIndexFiles: Record<string, string> = {
-      'language-guide.md': 'Language Guide',
-      'api.md': 'API Reference'
-    }
-
-    Object.values(dirs).forEach(dir => {
-      console.log(`Creating "${dir}" directory`)
-      mkdirSync(path.join(outPath, dir), { recursive: true })
-    })
-
-    core.startGroup('Moving files into subdirectories')
-    files.forEach(file => {
-      const fileName = path.basename(file)
-
-      if (dirIndexFiles[fileName]) {
-        const dest = path.join(outPath, dirIndexFiles[fileName], 'index.md')
-        renameSync(file, dest)
-        console.log(
-          `Moved ${fileName} to ${path.join(dirIndexFiles[fileName], 'index.md')}`
-        )
-        return
-      }
-
-      const dirPrefix = fileName.split('-')[0]
-      if (dirPrefix.endsWith('.md')) return
-      const dirName = dirs[dirPrefix]
-      // Put in dir if dirName is defined, otherwise put in root
-      const dest = path.join(outPath, dirName ?? '', fileName)
-      renameSync(file, dest)
-      console.log(`Moved ${fileName} to ${path.join(dirName ?? '', fileName)}`)
-    })
+    core.startGroup('Generating MDX files')
+    console.log('TODO: Generate MDX files')
     core.endGroup()
   } catch (error) {
     // Fail the workflow run if an error occurs
