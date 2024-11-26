@@ -8,43 +8,15 @@ import {
   writeFileSync,
   readFileSync
 } from 'fs'
-import { remark } from 'remark'
 import { visit } from 'unist-util-visit'
 import { Node } from 'unist'
 import { Link } from 'mdast'
+import * as cheerio from 'cheerio'
 
 /** A mapping of filename prefixes to the directory they should be moved to. */
 const dirPrefixes: Record<string, string> = {
   lg: 'Language Guide',
   api: 'API Reference'
-}
-
-const transformLinks = () => {
-  return (tree: Node) => {
-    visit(tree, 'link', (node: Link) => {
-      const { url } = node
-      if (url.trim() && !url.startsWith('https://') && !url.startsWith('#')) {
-        const originalUrl = url
-        node.url = `../${url.replace('.md', '')}`
-
-        Object.keys(dirPrefixes).forEach(prefix => {
-          if (path.basename(node.url).startsWith(prefix)) {
-            node.url = node.url.replace(
-              prefix,
-              '../' +
-                dirPrefixes[prefix].toLowerCase().replaceAll(' ', '-') +
-                '/' +
-                prefix
-            )
-          }
-        })
-
-        console.log(`Transformed link (${originalUrl}) to (${node.url})`)
-      }
-
-      // TODO: slug transformation
-    })
-  }
 }
 
 /**
@@ -73,12 +45,52 @@ export async function run(): Promise<void> {
     }
     core.endGroup()
 
+    const titles: Record<string, string> = {}
+
     core.startGroup('Transforming content')
-    console.log('TODO: Transform content')
+    for (const file of files) {
+      const html = readFileSync(file, 'utf-8')
+      const $ = cheerio.load(html)
+
+      // Extract content from the nested div structure
+      let content =
+        $(
+          '.page .main .content .article-container #furo-main-content'
+        ).html() || ''
+
+      content = content
+
+      const title = (
+        $('h1 span').first().text() || $('h1').first().text()
+      )?.replace('¶', '')
+
+      titles[file] = title ?? path.basename(file)
+
+      // Write only the extracted content back to the file
+      writeFileSync(file, content)
+      console.log(`Transformed ${path.relative(htmlPath, file)}`)
+    }
     core.endGroup()
 
     core.startGroup('Generating MDX files')
-    console.log('TODO: Generate MDX files')
+
+    // Iterate over titles
+    for (const [file, title] of Object.entries(titles)) {
+      const mdxPath = path
+        .join(outPath, path.relative(htmlPath, file))
+        .replace('.html', '.mdx')
+      const mdx = `---
+title: "${title}"
+---
+
+import HTMLContent from './html/${path.relative(htmlPath, file)}'
+
+<HTMLContent />
+`
+
+      writeFileSync(mdxPath, mdx)
+    }
+
     core.endGroup()
   } catch (error) {
     // Fail the workflow run if an error occurs
