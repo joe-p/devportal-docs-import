@@ -27,7 +27,6 @@ export async function run(): Promise<void> {
   try {
     const docsPath = core.getInput('docsPath', { required: true })
     const outPath = core.getInput('outPath', { required: true })
-    const htmlPath = path.join(outPath, 'html')
 
     const globber = await glob.create(path.join(docsPath, '**.html'))
 
@@ -36,7 +35,9 @@ export async function run(): Promise<void> {
     core.startGroup('Copying HTML files')
     for await (const file of globber.globGenerator()) {
       console.log(`Copying ${path.relative(docsPath, file)}`)
-      const dest = path.join(htmlPath, path.relative(docsPath, file))
+      const dest = path
+        .join(outPath, path.relative(docsPath, file))
+        .replace('.html', '.mdx')
 
       mkdirSync(path.dirname(dest), { recursive: true })
 
@@ -77,11 +78,15 @@ export async function run(): Promise<void> {
         $('h1 span').first().text() || $('h1').first().text()
       )?.replace('¶', '')
 
-      titles[file] = title ?? path.basename(file)
+      content = `---
+title: "${title}"
+---
+<div set:html={\`${content}\`} />
+`
 
       // Write only the extracted content back to the file
       writeFileSync(file, content)
-      console.log(`Transformed ${path.relative(htmlPath, file)}`)
+      console.log(`Transformed ${file}`)
     }
     core.endGroup()
 
