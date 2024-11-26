@@ -49,13 +49,9 @@ export async function run(): Promise<void> {
     core.startGroup('Transforming content')
     for (const file of files) {
       const html = readFileSync(file, 'utf-8')
-      const $ = cheerio.load(html)
-
-      // Extract content from the nested div structure
-      let content =
-        $(
-          '.page .main .content .article-container #furo-main-content'
-        ).html() || ''
+      let $ = cheerio.load(html, {
+        sourceCodeLocationInfo: true
+      })
 
       // Append '../' to all relative links using cheerio
       $('a').each((_, el) => {
@@ -67,23 +63,55 @@ export async function run(): Promise<void> {
       })
 
       // Update content with the modified HTML
-      content =
+      let mainContent =
         $(
           '.page .main .content .article-container #furo-main-content'
-        ).html() || content
+        ).html() || ''
+
+      $ = cheerio.load(mainContent, {
+        sourceCodeLocationInfo: true
+      })
 
       const title = (
         $('h1 span').first().text() || $('h1').first().text()
       )?.replace('¶', '')
 
-      content = `---
+      let mdx = `---
 title: "${title}"
 ---
-<div set:html={\`${content}\`} />
 `
+      let offset = 0
+
+      $('.highlight-python').each((_, el) => {
+        const { sourceCodeLocation } = el
+        if (sourceCodeLocation === null || sourceCodeLocation === undefined)
+          throw Error(
+            'sourceCodeLocation is null or undefined, but it should be enabled when loading'
+          )
+
+        // Push all the content before the code block
+        mdx += `<Fragment set:html={\`${mainContent.slice(
+          offset,
+          sourceCodeLocation.startOffset
+        )}\`} />`
+
+        // Push the code block
+        // TODO: Use Astro code block instead
+        mdx += `<Fragment set:html={\`${mainContent.slice(
+          sourceCodeLocation.startOffset,
+          sourceCodeLocation.endOffset
+        )}\`} />`
+
+        // Update the offset to the end of the code block
+        offset = el.sourceCodeLocation?.endOffset!
+        console.debug(
+          sourceCodeLocation.startOffset,
+          sourceCodeLocation.endOffset
+        )
+      })
 
       // Write only the extracted content back to the file
-      writeFileSync(file, content)
+      writeFileSync(file, mdx)
       console.log(`Transformed ${file}`)
     }
     core.endGroup()
