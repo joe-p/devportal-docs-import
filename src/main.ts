@@ -79,6 +79,8 @@ export async function run(): Promise<void> {
       let mdx = `---
 title: "${title}"
 ---
+import { Code } from '@astrojs/starlight/components';
+
 `
       let offset = 0
 
@@ -96,11 +98,10 @@ title: "${title}"
         )}\`} />`
 
         // Push the code block
-        // TODO: Use Astro code block instead
-        mdx += `<Fragment set:html={\`${mainContent.slice(
+        mdx += `<Code code={\`${mainContent.slice(
           sourceCodeLocation.startOffset,
           sourceCodeLocation.endOffset
-        )}\`} />`
+        )}\`} lang='py' frame='none' />`
 
         // Update the offset to the end of the code block
         offset = el.sourceCodeLocation?.endOffset!
