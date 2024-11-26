@@ -58,7 +58,20 @@ export async function run(): Promise<void> {
           '.page .main .content .article-container #furo-main-content'
         ).html() || ''
 
-      content = content
+      // Append '../' to all relative links using cheerio
+      $('a').each((_, el) => {
+        const href = $(el).attr('href')
+        if (href && !href.startsWith('http') && !href.startsWith('#')) {
+          console.log(`Fixing link ${href}`)
+          $(el).attr('href', `../${href}`)
+        }
+      })
+
+      // Update content with the modified HTML
+      content =
+        $(
+          '.page .main .content .article-container #furo-main-content'
+        ).html() || content
 
       const title = (
         $('h1 span').first().text() || $('h1').first().text()
