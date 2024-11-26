@@ -46,8 +46,6 @@ export async function run(): Promise<void> {
     }
     core.endGroup()
 
-    const titles: Record<string, string> = {}
-
     core.startGroup('Transforming content')
     for (const file of files) {
       const html = readFileSync(file, 'utf-8')
@@ -91,23 +89,6 @@ title: "${title}"
     core.endGroup()
 
     core.startGroup('Generating MDX files')
-
-    // Iterate over titles
-    for (const [file, title] of Object.entries(titles)) {
-      const mdxPath = path
-        .join(outPath, path.relative(htmlPath, file))
-        .replace('.html', '.mdx')
-      const mdx = `---
-title: "${title}"
----
-
-import HTMLContent from './html/${path.relative(htmlPath, file)}'
-
-<HTMLContent />
-`
-
-      writeFileSync(mdxPath, mdx)
-    }
 
     core.endGroup()
   } catch (error) {
