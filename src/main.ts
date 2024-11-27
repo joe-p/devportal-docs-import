@@ -72,12 +72,12 @@ export async function run(): Promise<void> {
         sourceCodeLocationInfo: true
       })
 
-      // Remove the first h1 element
-      $('h1').first().remove()
-
       const title = (
         $('h1 span').first().text() || $('h1').first().text()
       )?.replace('¶', '')
+
+      // Remove the first h1 element
+      $('h1').first().remove()
 
       let mdx = `---
 title: "${title}"
@@ -117,10 +117,6 @@ import { Code } from '@astrojs/starlight/components';
 
         // Update the offset to the end of the code block
         offset = el.sourceCodeLocation?.endOffset!
-        console.debug(
-          sourceCodeLocation.startOffset,
-          sourceCodeLocation.endOffset
-        )
       })
 
       // Write only the extracted content back to the file
