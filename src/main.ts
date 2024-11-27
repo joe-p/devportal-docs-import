@@ -72,6 +72,9 @@ export async function run(): Promise<void> {
         sourceCodeLocationInfo: true
       })
 
+      // Remove the first h1 element
+      $('h1').first().remove()
+
       const title = (
         $('h1 span').first().text() || $('h1').first().text()
       )?.replace('¶', '')
@@ -84,7 +87,7 @@ import { Code } from '@astrojs/starlight/components';
 `
       let offset = 0
 
-      $('.highlight-python').each((_, el) => {
+      $('.highlight-python, :header').each((_, el) => {
         const { sourceCodeLocation } = el
         if (sourceCodeLocation === null || sourceCodeLocation === undefined)
           throw Error(
@@ -98,10 +101,19 @@ import { Code } from '@astrojs/starlight/components';
         )}\`} />`
 
         // Push the code block
-        mdx += `<Code code={\`${mainContent.slice(
-          sourceCodeLocation.startOffset,
-          sourceCodeLocation.endOffset
-        )}\`} lang='py' frame='none' />`
+        if (el.tagName === 'div' && $(el).hasClass('highlight-python')) {
+          mdx += `<Code code={\`${mainContent.slice(
+            sourceCodeLocation.startOffset,
+            sourceCodeLocation.endOffset
+          )}\`} lang='py' frame='none' />`
+        } else if (el.tagName.match(/^h[1-6]$/)) {
+          // Convert HTML headers to Markdown
+          const level = parseInt(el.tagName[1])
+          const headerText = $(el).text().replace('¶', '').trim()
+          mdx += '\n' + '#'.repeat(level) + ' ' + headerText + '\n\n'
+        } else {
+          throw Error(`Unknown element: ${$.html(el)}`)
+        }
 
         // Update the offset to the end of the code block
         offset = el.sourceCodeLocation?.endOffset!
